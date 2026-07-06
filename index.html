@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Argus Capture</title>
+<style>
+  :root{
+    --purple:#4A2C7A;
+    --gold:#C9A961;
+    --ink:#1A1A1A;
+    --gray:#8A8A8A;
+    --line:#E4E0D8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;background:#000;overscroll-behavior:none;}
+  .screen{display:none;height:100%;}
+  .screen.active{display:flex;flex-direction:column;}
+
+  /* ---------- START ---------- */
+  #startScreen{background:#fff;padding:max(24px,env(safe-area-inset-top)) 20px 24px;}
+  #startScreen header{border-bottom:3px solid var(--purple);padding:18px 0 14px;margin-bottom:28px;}
+  #startScreen h1{font-size:24px;letter-spacing:4px;color:var(--purple);}
+  #startScreen header p{font-size:12px;color:var(--gray);margin-top:4px;letter-spacing:1px;}
+  .lbl{font-size:11px;letter-spacing:2px;color:var(--gold);font-weight:bold;text-transform:uppercase;margin-bottom:8px;}
+  #address{width:100%;padding:14px;border:1px solid var(--line);font-size:16px;margin-bottom:22px;}
+  #address:focus{outline:2px solid var(--purple);}
+  .row{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);}
+  .row .name{font-size:14px;color:var(--ink);}
+  .row .val{font-size:14px;color:var(--purple);font-weight:bold;}
+  .stepper{display:flex;align-items:center;gap:14px;}
+  .stepper button{width:36px;height:36px;border:1px solid var(--purple);background:#fff;color:var(--purple);font-size:18px;font-weight:bold;}
+  .bigbtn{width:100%;padding:18px;font-size:15px;letter-spacing:2px;font-weight:bold;text-transform:uppercase;border:none;cursor:pointer;}
+  .bigbtn.purple{background:var(--purple);color:#fff;margin-top:30px;}
+  .bigbtn.outline{background:#fff;color:var(--purple);border:2px solid var(--gold);margin-top:14px;}
+  #resumeNote{font-size:12px;color:var(--gray);margin-top:10px;text-align:center;display:none;}
+  #startErr{color:#8B2020;font-size:13px;margin-top:14px;text-align:center;min-height:18px;}
+
+  /* ---------- CAPTURE ---------- */
+  #captureScreen{background:#000;position:relative;}
+  #viewfinder{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  #topBar{position:absolute;top:0;left:0;right:0;padding:max(14px,env(safe-area-inset-top)) 16px 10px;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(rgba(0,0,0,.55),transparent);z-index:5;}
+  #shotCount{color:#fff;font-size:16px;font-weight:bold;letter-spacing:1px;}
+  #addrTag{color:var(--gold);font-size:11px;letter-spacing:1px;max-width:55%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #endBtn{background:rgba(0,0,0,.4);color:#fff;border:1px solid rgba(255,255,255,.5);padding:8px 14px;font-size:12px;letter-spacing:1px;}
+  #bottomBar{position:absolute;bottom:0;left:0;right:0;padding:16px 24px max(26px,env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:space-between;background:linear-gradient(transparent,rgba(0,0,0,.6));z-index:5;}
+  #thumb{width:52px;height:52px;border:2px solid rgba(255,255,255,.7);background:#222;object-fit:cover;}
+  #shutter{width:78px;height:78px;border-radius:50%;border:5px solid #fff;background:rgba(255,255,255,.25);}
+  #shutter:active{background:#fff;}
+  #shutter.recording{border-color:var(--gold);background:rgba(201,169,97,.45);}
+  #shutter:disabled{opacity:.4;}
+  #micState{width:52px;text-align:center;color:#fff;font-size:11px;letter-spacing:1px;}
+  #levelWrap{position:absolute;bottom:130px;left:24px;right:24px;height:6px;background:rgba(255,255,255,.2);display:none;z-index:5;}
+  #levelBar{height:100%;width:0%;background:var(--gold);}
+  #recBanner{position:absolute;top:50%;left:0;right:0;text-align:center;transform:translateY(-160px);color:var(--gold);font-size:13px;letter-spacing:3px;font-weight:bold;display:none;z-index:5;text-shadow:0 1px 4px #000;}
+  #flashOverlay{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .08s;z-index:4;}
+
+  /* ---------- REVIEW ---------- */
+  #reviewScreen{background:#fff;padding:max(20px,env(safe-area-inset-top)) 16px 40px;overflow-y:auto;}
+  #reviewScreen h2{font-size:18px;letter-spacing:2px;color:var(--purple);border-bottom:3px solid var(--purple);padding-bottom:12px;margin-bottom:16px;}
+  .sumline{font-size:13px;color:var(--gray);margin-bottom:18px;}
+  .pair{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);}
+  .pair img{width:64px;height:64px;object-fit:cover;border:1px solid var(--line);}
+  .pair .pnum{font-weight:bold;color:var(--purple);font-size:14px;min-width:30px;}
+  .pair audio{flex:1;height:36px;min-width:0;}
+  .pair .noaudio{flex:1;font-size:12px;color:var(--gray);}
+  #exportStatus{font-size:13px;color:var(--gray);text-align:center;margin-top:12px;min-height:18px;}
+</style>
+</head>
+<body>
+
+<!-- START -->
+<div class="screen active" id="startScreen">
+  <header>
+    <h1>ARGUS CAPTURE</h1>
+    <p>Photo and callout in one tap. Works with no signal.</p>
+  </header>
+  <div class="lbl">Property address</div>
+  <input type="text" id="address" placeholder="e.g. 1120-N-91st-St" autocomplete="off">
+  <div class="row">
+    <span class="name">Silence gap ends clip after</span>
+    <span class="stepper">
+      <button id="gapDown" type="button">&minus;</button>
+      <span class="val" id="gapShow">3.0 s</span>
+      <button id="gapUp" type="button">+</button>
+    </span>
+  </div>
+  <div class="row">
+    <span class="name">Location tag on each photo</span>
+    <span class="val" id="gpsShow">On</span>
+  </div>
+  <button class="bigbtn purple" id="startBtn">Start inspection</button>
+  <button class="bigbtn outline" id="resumeBtn" style="display:none;">Resume last session</button>
+  <div id="resumeNote"></div>
+  <div id="startErr"></div>
+</div>
+
+<!-- CAPTURE -->
+<div class="screen" id="captureScreen">
+  <video id="viewfinder" autoplay playsinline muted></video>
+  <div id="flashOverlay"></div>
+  <div id="topBar">
+    <span id="addrTag"></span>
+    <span id="shotCount">0</span>
+    <button id="endBtn" type="button">END</button>
+  </div>
+  <div id="recBanner">RECORDING CALLOUT</div>
+  <div id="levelWrap"><div id="levelBar"></div></div>
+  <div id="bottomBar">
+    <img id="thumb" alt="">
+    <button id="shutter" type="button" aria-label="Take photo"></button>
+    <div id="micState">READY</div>
+  </div>
+</div>
+
+<!-- REVIEW -->
+<div class="screen" id="reviewScreen">
+  <h2>REVIEW &amp; EXPORT</h2>
+  <div class="sumline" id="reviewSummary"></div>
+  <div id="pairList"></div>
+  <button class="bigbtn purple" id="exportBtn">Export zip</button>
+  <button class="bigbtn outline" id="backBtn">Back to camera</button>
+  <button class="bigbtn outline" id="clearBtn" style="border-color:#B85C5C;color:#8B2020;">Finish &amp; clear session</button>
+  <div id="exportStatus"></div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ---------------- state ---------------- */
+  var db = null;
+  var session = { address:'', gap:3.0, count:0 };
+  var videoStream = null, audioStream = null;
+  var audioCtx = null, analyser = null, levelData = null;
+  var recorder = null, recChunks = [], recIndex = 0;
+  var recState = 'idle'; // idle | recording
+  var speechSeen = false, silenceMs = 0, monitorTimer = null;
+  var wakeLock = null;
+  var THRESHOLD = 0.028; // analyser RMS threshold for voice
+  var busy = false;
+
+  var $ = function(id){ return document.getElementById(id); };
+
+  /* ---------------- indexedDB ---------------- */
+  function openDB(){
+    return new Promise(function(res, rej){
+      var rq = indexedDB.open('argus-capture', 1);
+      rq.onupgradeneeded = function(e){
+        var d = e.target.result;
+        if(!d.objectStoreNames.contains('pairs')){
+          d.createObjectStore('pairs', {keyPath:'idx'});
+        }
+        if(!d.objectStoreNames.contains('meta')){
+          d.createObjectStore('meta', {keyPath:'k'});
+        }
+      };
+      rq.onsuccess = function(){ res(rq.result); };
+      rq.onerror = function(){ rej(rq.error); };
+    });
+  }
+  function dbPut(store, obj){
+    return new Promise(function(res, rej){
+      var tx = db.transaction(store,'readwrite');
+      tx.objectStore(store).put(obj);
+      tx.oncomplete = res; tx.onerror = function(){ rej(tx.error); };
+    });
+  }
+  function dbAll(store){
+    return new Promise(function(res, rej){
+      var out = [];
+      var tx = db.transaction(store,'readonly');
+      var cur = tx.objectStore(store).openCursor();
+      cur.onsuccess = function(e){
+        var c = e.target.result;
+        if(c){ out.push(c.value); c.continue(); } else res(out);
+      };
+      cur.onerror = function(){ rej(cur.error); };
+    });
+  }
+  function dbClear(store){
+    return new Promise(function(res){
+      var tx = db.transaction(store,'readwrite');
+      tx.objectStore(store).clear();
+      tx.oncomplete = res;
+    });
+  }
+
+  /* ---------------- start screen ---------------- */
+  var gapShow = $('gapShow');
+  $('gapDown').onclick = function(){ session.gap = Math.max(1, session.gap-0.5); gapShow.textContent = session.gap.toFixed(1)+' s'; };
+  $('gapUp').onclick = function(){ session.gap = Math.min(6, session.gap+0.5); gapShow.textContent = session.gap.toFixed(1)+' s'; };
+  var gpsOn = true;
+  $('gpsShow').parentElement.onclick = function(){ gpsOn = !gpsOn; $('gpsShow').textContent = gpsOn ? 'On' : 'Off'; };
+
+  function show(id){
+    document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+    $(id).classList.add('active');
+  }
+
+  $('startBtn').onclick = function(){
+    var addr = $('address').value.trim().replace(/[^A-Za-z0-9\-_. ]/g,'').replace(/\s+/g,'-');
+    if(!addr){ $('startErr').textContent = 'Enter the property address first.'; return; }
+    session.address = addr;
+    session.count = 0;
+    dbClear('pairs').then(function(){
+      return dbPut('meta', {k:'session', address:addr, gap:session.gap, when:Date.now()});
+    }).then(beginCapture);
+  };
+
+  $('resumeBtn').onclick = function(){
+    dbAll('pairs').then(function(pairs){
+      session.count = pairs.length;
+      beginCapture();
+    });
+  };
+
+  function beginCapture(){
+    $('startErr').textContent = '';
+    startMedia().then(function(){
+      $('addrTag').textContent = session.address;
+      $('shotCount').textContent = session.count;
+      show('captureScreen');
+      requestWake();
+    }).catch(function(err){
+      $('startErr').textContent = 'Camera/mic blocked: ' + err.message + '. This page needs HTTPS and permission for both.';
+    });
+  }
+
+  function startMedia(){
+    var vid = navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:'environment', width:{ideal:1920}, height:{ideal:1440} },
+      audio:false
+    }).then(function(s){
+      videoStream = s;
+      $('viewfinder').srcObject = s;
+    });
+    var aud = navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:true }, video:false })
+      .then(function(s){
+        audioStream = s;
+        audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+        var src = audioCtx.createMediaStreamSource(s);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 1024;
+        levelData = new Float32Array(analyser.fftSize);
+        src.connect(analyser);
+      });
+    return Promise.all([vid, aud]);
+  }
+
+  function requestWake(){
+    if('wakeLock' in navigator){
+      navigator.wakeLock.request('screen').then(function(w){ wakeLock = w; }).catch(function(){});
+    }
+  }
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'visible' && $('captureScreen').classList.contains('active')){
+      requestWake();
+      if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    }
+  });
+
+  /* ---------------- capture ---------------- */
+  $('shutter').onclick = function(){
+    if(busy) return;
+    if(recState === 'recording'){ stopRecording('manual'); return; }
+    busy = true;
+    takePhoto().then(function(pair){
+      startRecording(pair);
+      busy = false;
+    }).catch(function(){ busy = false; });
+  };
+
+  function takePhoto(){
+    var video = $('viewfinder');
+    var fl = $('flashOverlay');
+    fl.style.opacity = '0.7';
+    setTimeout(function(){ fl.style.opacity = '0'; }, 90);
+
+    var canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+
+    session.count++;
+    var idx = session.count;
+    $('shotCount').textContent = idx;
+
+    var pair = { idx:idx, ts:Date.now(), lat:null, lon:null, photo:null, audio:null, audioType:'', dur:0 };
+
+    if(gpsOn && navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(function(pos){
+        pair.lat = pos.coords.latitude; pair.lon = pos.coords.longitude;
+        if(pair.photo) dbPut('pairs', pair);
+      }, function(){}, {maximumAge:60000, timeout:5000});
+    }
+
+    return new Promise(function(res){
+      canvas.toBlob(function(blob){
+        pair.photo = blob;
+        $('thumb').src = URL.createObjectURL(blob);
+        dbPut('pairs', pair).then(function(){ res(pair); });
+      }, 'image/jpeg', 0.88);
+    });
+  }
+
+  function pickMime(){
+    if(window.MediaRecorder){
+      if(MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/mp4')) return 'audio/mp4';
+      if(MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/webm')) return 'audio/webm';
+    }
+    return '';
+  }
+
+  function startRecording(pair){
+    if(!audioStream || !window.MediaRecorder){ return; }
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    recChunks = [];
+    recIndex = pair.idx;
+    var mime = pickMime();
+    try{
+      recorder = mime ? new MediaRecorder(audioStream, {mimeType:mime}) : new MediaRecorder(audioStream);
+    }catch(e){ recorder = new MediaRecorder(audioStream); }
+    recorder.ondataavailable = function(e){ if(e.data && e.data.size) recChunks.push(e.data); };
+    recorder.onstop = function(){
+      var type = recorder.mimeType || 'audio/mp4';
+      var blob = new Blob(recChunks, {type:type});
+      finalizeAudio(recIndex, blob, type);
+    };
+    recorder.start();
+    recState = 'recording';
+    speechSeen = false;
+    silenceMs = 0;
+    var startAt = Date.now();
+
+    $('shutter').classList.add('recording');
+    $('micState').textContent = 'LISTENING';
+    $('recBanner').style.display = 'block';
+    $('levelWrap').style.display = 'block';
+
+    monitorTimer = setInterval(function(){
+      analyser.getFloatTimeDomainData(levelData);
+      var sum = 0;
+      for(var i=0;i<levelData.length;i++){ sum += levelData[i]*levelData[i]; }
+      var rms = Math.sqrt(sum/levelData.length);
+      $('levelBar').style.width = Math.min(100, rms*900) + '%';
+
+      var voiced = rms > THRESHOLD;
+      if(voiced){
+        speechSeen = true;
+        silenceMs = 0;
+        $('micState').textContent = 'VOICE';
+      }else{
+        silenceMs += 50;
+        if(speechSeen) $('micState').textContent = 'SILENCE';
+      }
+      var elapsed = Date.now() - startAt;
+      // 3s (configurable) of silence ends it; if no voice at all, close at gap too
+      if(silenceMs >= session.gap*1000 && elapsed > 700){
+        stopRecording(speechSeen ? 'auto' : 'empty');
+      }
+      // hard cap 60s safety
+      if(elapsed > 60000){ stopRecording('cap'); }
+    }, 50);
+  }
+
+  function stopRecording(){
+    if(recState !== 'recording') return;
+    recState = 'idle';
+    clearInterval(monitorTimer);
+    $('shutter').classList.remove('recording');
+    $('micState').textContent = 'READY';
+    $('recBanner').style.display = 'none';
+    $('levelWrap').style.display = 'none';
+    $('levelBar').style.width = '0%';
+    try{ recorder.stop(); }catch(e){}
+  }
+
+  function finalizeAudio(idx, blob, type){
+    if(!speechSeen || blob.size < 2000){ return; } // no callout given, keep photo only
+    db.transaction('pairs','readwrite').objectStore('pairs').get(idx).onsuccess = function(e){
+      var pair = e.target.result;
+      if(!pair) return;
+      pair.audio = blob;
+      pair.audioType = type;
+      dbPut('pairs', pair);
+    };
+  }
+
+  $('endBtn').onclick = function(){
+    stopRecording();
+    buildReview();
+  };
+
+  /* ---------------- review ---------------- */
+  function buildReview(){
+    dbAll('pairs').then(function(pairs){
+      pairs.sort(function(a,b){ return a.idx-b.idx; });
+      var list = $('pairList');
+      list.innerHTML = '';
+      var withAudio = 0;
+      pairs.forEach(function(p){
+        if(p.audio) withAudio++;
+        var row = document.createElement('div');
+        row.className = 'pair';
+        var n = p.idx;
+        var img = p.photo ? '<img src="'+URL.createObjectURL(p.photo)+'">' : '<div style="width:64px"></div>';
+        row.innerHTML = '<span class="pnum">'+(n<10?'0':'')+n+'</span>'+img;
+        if(p.audio){
+          var a = document.createElement('audio');
+          a.controls = true; a.preload = 'none';
+          a.src = URL.createObjectURL(p.audio);
+          row.appendChild(a);
+        }else{
+          var d = document.createElement('div');
+          d.className = 'noaudio';
+          d.textContent = 'No callout recorded';
+          row.appendChild(d);
+        }
+        list.appendChild(row);
+      });
+      $('reviewSummary').textContent = pairs.length + ' photos, ' + withAudio + ' with callouts. ' + session.address;
+      show('reviewScreen');
+    });
+  }
+
+  $('backBtn').onclick = function(){ show('captureScreen'); requestWake(); };
+
+  $('clearBtn').onclick = function(){
+    if(!confirm('Clear all photos and audio from this session? Export first if you have not.')) return;
+    dbClear('pairs').then(function(){
+      session.count = 0;
+      location.reload();
+    });
+  };
+
+  /* ---------------- zip (store method, no deps) ---------------- */
+  var crcTable = (function(){
+    var t = new Uint32Array(256);
+    for(var n=0;n<256;n++){
+      var c = n;
+      for(var k=0;k<8;k++){ c = (c&1) ? (0xEDB88320 ^ (c>>>1)) : (c>>>1); }
+      t[n] = c>>>0;
+    }
+    return t;
+  })();
+  function crc32(bytes){
+    var c = 0xFFFFFFFF;
+    for(var i=0;i<bytes.length;i++){ c = crcTable[(c ^ bytes[i]) & 0xFF] ^ (c>>>8); }
+    return (c ^ 0xFFFFFFFF)>>>0;
+  }
+  function zipFiles(entries){
+    // entries: [{name, bytes(Uint8Array)}]
+    var parts = [], central = [], offset = 0;
+    var enc = new TextEncoder();
+    entries.forEach(function(en){
+      var nameB = enc.encode(en.name);
+      var crc = crc32(en.bytes);
+      var local = new DataView(new ArrayBuffer(30));
+      local.setUint32(0, 0x04034b50, true);
+      local.setUint16(4, 20, true);
+      local.setUint16(6, 0x0800, true); // utf-8 names
+      local.setUint16(8, 0, true);      // store
+      local.setUint16(10, 0, true); local.setUint16(12, 0, true);
+      local.setUint32(14, crc, true);
+      local.setUint32(18, en.bytes.length, true);
+      local.setUint32(22, en.bytes.length, true);
+      local.setUint16(26, nameB.length, true);
+      local.setUint16(28, 0, true);
+      parts.push(local.buffer, nameB, en.bytes);
+
+      var cen = new DataView(new ArrayBuffer(46));
+      cen.setUint32(0, 0x02014b50, true);
+      cen.setUint16(4, 20, true); cen.setUint16(6, 20, true);
+      cen.setUint16(8, 0x0800, true); cen.setUint16(10, 0, true);
+      cen.setUint16(12, 0, true); cen.setUint16(14, 0, true);
+      cen.setUint32(16, crc, true);
+      cen.setUint32(20, en.bytes.length, true);
+      cen.setUint32(24, en.bytes.length, true);
+      cen.setUint16(28, nameB.length, true);
+      cen.setUint16(30, 0, true); cen.setUint16(32, 0, true);
+      cen.setUint16(34, 0, true); cen.setUint16(36, 0, true);
+      cen.setUint32(38, 0, true);
+      cen.setUint32(42, offset, true);
+      central.push(cen.buffer, nameB);
+      offset += 30 + nameB.length + en.bytes.length;
+    });
+    var centralSize = central.reduce(function(s,b){ return s + (b.byteLength||b.length); }, 0);
+    var end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true);
+    end.setUint16(8, entries.length, true);
+    end.setUint16(10, entries.length, true);
+    end.setUint32(12, centralSize, true);
+    end.setUint32(16, offset, true);
+    end.setUint16(20, 0, true);
+    return new Blob(parts.concat(central, [end.buffer]), {type:'application/zip'});
+  }
+
+  function blobBytes(blob){
+    return blob.arrayBuffer().then(function(ab){ return new Uint8Array(ab); });
+  }
+  function pad3(n){ return (n<100?(n<10?'00':'0'):'')+n; }
+
+  $('exportBtn').onclick = function(){
+    var st = $('exportStatus');
+    st.textContent = 'Packing...';
+    dbAll('pairs').then(function(pairs){
+      pairs.sort(function(a,b){ return a.idx-b.idx; });
+      var jobs = [];
+      var manifest = 'ARGUS CAPTURE  ' + session.address + '\nExported ' + new Date().toLocaleString() + '\n\n';
+      pairs.forEach(function(p){
+        var base = session.address + '_' + pad3(p.idx);
+        if(p.photo){
+          jobs.push(blobBytes(p.photo).then(function(b){ return {name:base+'.jpg', bytes:b}; }));
+        }
+        if(p.audio){
+          var ext = (p.audioType.indexOf('webm')>-1) ? '.webm' : '.m4a';
+          jobs.push(blobBytes(p.audio).then(function(b){ return {name:base+ext, bytes:b}; }));
+        }
+        manifest += base + '  ' + new Date(p.ts).toLocaleTimeString() +
+          (p.lat ? ('  ' + p.lat.toFixed(6) + ',' + p.lon.toFixed(6)) : '') +
+          (p.audio ? '  [callout]' : '  [no callout]') + '\n';
+      });
+      jobs.push(Promise.resolve({name:'manifest.txt', bytes:new TextEncoder().encode(manifest)}));
+      Promise.all(jobs).then(function(entries){
+        var zip = zipFiles(entries);
+        var a = document.createElement('a');
+        var url = URL.createObjectURL(zip);
+        a.href = url;
+        a.download = session.address + '_inspection.zip';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
+        st.textContent = 'Zip saved. Session stays on this phone until you clear it.';
+      }).catch(function(){ st.textContent = 'Export failed. Try again.'; });
+    });
+  };
+
+  /* ---------------- boot ---------------- */
+  openDB().then(function(d){
+    db = d;
+    return dbAll('pairs');
+  }).then(function(pairs){
+    if(pairs.length){
+      $('resumeBtn').style.display = 'block';
+      $('resumeNote').style.display = 'block';
+      $('resumeNote').textContent = pairs.length + ' captures from a previous session are still on this phone.';
+      db.transaction('meta','readonly').objectStore('meta').get('session').onsuccess = function(e){
+        if(e.target.result){
+          session.address = e.target.result.address;
+          session.gap = e.target.result.gap || 3.0;
+          $('address').value = session.address;
+          gapShow.textContent = session.gap.toFixed(1)+' s';
+        }
+      };
+    }
+  });
+
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  }
+})();
+</script>
+</body>
+</html>
